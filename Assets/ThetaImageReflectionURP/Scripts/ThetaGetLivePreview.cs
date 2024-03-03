@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -19,6 +20,8 @@ namespace ThetaImageReflectionURP.Scripts
         {
             Full = 1,
             Half = 2,
+            Quarter = 4,
+            Eighth = 8
         }
 
         [SerializeField]
@@ -28,13 +31,14 @@ namespace ThetaImageReflectionURP.Scripts
         private List<Texture2D> previewTextureList = new(PoolCount);
         private BinaryReader binaryReader;
 
-        public Texture ThetaTexture => previewTextureList[currentPreviewIndex];
+        public Texture2D ThetaTexture => previewTextureList[currentPreviewIndex];
 
         void Start()
         {
             for (var i = 0; i < PoolCount; i++)
             {
-                previewTextureList.Add(new Texture2D(MaxWidth / (int)resolutionPer, MaxHeight / (int)resolutionPer));
+                // previewTextureList.Add(new Texture2D(MaxWidth / (int)resolutionPer, MaxHeight / (int)resolutionPer));
+                previewTextureList.Add(new Texture2D(128, 128));
             }
 
             var request = WebRequest.Create(Url);
@@ -54,9 +58,20 @@ namespace ThetaImageReflectionURP.Scripts
             StartCoroutine(GetLivePreview());
         }
 
+        private void OnDestroy()
+        {
+            StopCoroutine(GetLivePreview());
+            foreach (var tex in previewTextureList)
+            {
+                Destroy(tex);
+            }
+        }
+
         private IEnumerator GetLivePreview()
         {
-            var dataList = new List<byte>();
+
+            var dataArray = new byte[100000];
+            var index = 0;
             var isLoadStart = false;
 
             while (true)
@@ -66,31 +81,40 @@ namespace ThetaImageReflectionURP.Scripts
                     if (byteData == 0xFF){
                         var nextData = binaryReader.ReadByte();
                         if (nextData == 0xD8){
-                            dataList.Add(byteData);
-                            dataList.Add(nextData);
+                            // dataList.Add(byteData);
+                            // dataList.Add(nextData);
+                            dataArray[index] = byteData;
+                            index += 1;
+                            dataArray[index] = nextData;
+                            index += 1;
 
                             isLoadStart = true;
                         }
                     }
                 }else{
-                    dataList.Add(byteData);
+                    // dataList.Add(byteData);
+                    dataArray[index] = byteData;
+                    index += 1;
                     if (byteData == 0xFF){
                         var nextData = binaryReader.ReadByte();
                         if (nextData == 0xD9){
-                            dataList.Add(nextData);
-
-                            // Destroy(previewTextureList[currentPreviewIndex]);
-                            previewTextureList[currentPreviewIndex].LoadImage(dataList.ToArray());
+                            // dataList.Add(nextData);
+                            dataArray[index] = nextData;
+                            
+                            previewTextureList[currentPreviewIndex].LoadImage(dataArray);
                             currentPreviewIndex += 1;
                             if (previewTextureList.Count <= currentPreviewIndex)
                             {
                                 currentPreviewIndex = 0;
                             }
-                            dataList.Clear();
+                            // dataList.Clear();
+                            index = 0;
                             isLoadStart = false;
                             yield return null;
                         }else{
-                            dataList.Add(nextData);
+                            // dataList.Add(nextData);
+                            dataArray[index] = nextData;
+                            index += 1;
                         }
                     }
                 }
